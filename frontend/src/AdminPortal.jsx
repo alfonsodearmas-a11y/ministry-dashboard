@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Plane, Droplets, Zap, Shield, Save, CheckCircle, AlertCircle, LogOut, User, Calendar, Clock, ChevronDown, Eye, EyeOff, FileText, History, UserPlus, Mail, ArrowLeft, Battery, Sun, TrendingUp } from 'lucide-react';
+import { Plane, Droplets, Zap, Shield, Save, CheckCircle, AlertCircle, LogOut, User, Calendar, Clock, ChevronDown, Eye, EyeOff, FileText, History, UserPlus, Mail, ArrowLeft, Battery, Sun, TrendingUp, Upload } from 'lucide-react';
+import GPLExcelUpload from './components/GPLExcelUpload';
 
 // Simulated user accounts for each agency
 const USERS = {
@@ -1357,7 +1358,7 @@ export default function MinistryDashboardAdmin() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [submittedAgency, setSubmittedAgency] = useState(null);
   const [showRegistration, setShowRegistration] = useState(false);
-  const [useDBISForm, setUseDBISForm] = useState(true); // Default to DBIS form for GPL
+  const [gplEntryMode, setGplEntryMode] = useState('excel'); // 'dbis', 'excel', or 'basic' - default to Excel upload
 
   const handleLogin = (username, password) => {
     const userRecord = USERS[username];
@@ -1479,28 +1480,44 @@ export default function MinistryDashboardAdmin() {
         {/* GPL Form Type Toggle */}
         {selectedAgency === 'gpl' && (
           <div className="mb-6">
-            <div className="flex items-center gap-4 bg-[#1a2438] border border-[#243049] rounded-lg p-2 w-fit">
+            <div className="flex items-center gap-2 bg-[#1a2438] border border-[#243049] rounded-lg p-2 w-fit">
               <button
-                onClick={() => setUseDBISForm(true)}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  useDBISForm
+                onClick={() => setGplEntryMode('excel')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+                  gplEntryMode === 'excel'
                     ? 'bg-[#d4af37] text-[#0f1729]'
                     : 'text-[#94a3b8] hover:text-white'
                 }`}
               >
-                DBIS Report (Detailed)
+                <Upload size={16} />
+                Excel Upload
               </button>
               <button
-                onClick={() => setUseDBISForm(false)}
+                onClick={() => setGplEntryMode('dbis')}
                 className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  !useDBISForm
+                  gplEntryMode === 'dbis'
                     ? 'bg-[#d4af37] text-[#0f1729]'
                     : 'text-[#94a3b8] hover:text-white'
                 }`}
               >
-                Basic Entry
+                Manual Entry
+              </button>
+              <button
+                onClick={() => setGplEntryMode('basic')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  gplEntryMode === 'basic'
+                    ? 'bg-[#d4af37] text-[#0f1729]'
+                    : 'text-[#94a3b8] hover:text-white'
+                }`}
+              >
+                Basic
               </button>
             </div>
+            {gplEntryMode === 'excel' && (
+              <p className="text-sm text-[#94a3b8] mt-2">
+                Upload the daily DBIS Excel file received via email
+              </p>
+            )}
           </div>
         )}
 
@@ -1509,11 +1526,28 @@ export default function MinistryDashboardAdmin() {
           {/* Data Entry Form */}
           <div className="lg:col-span-2">
             {selectedAgency ? (
-              selectedAgency === 'gpl' && useDBISForm ? (
-                <GPLDBISForm
-                  onSubmit={handleSubmit}
-                  onCancel={() => user.agency === 'all' ? setSelectedAgency(null) : null}
-                />
+              selectedAgency === 'gpl' ? (
+                gplEntryMode === 'excel' ? (
+                  <GPLExcelUpload
+                    onSuccess={(data) => {
+                      console.log('Excel upload success:', data);
+                      setSubmittedAgency('gpl');
+                      setShowSuccess(true);
+                    }}
+                    onCancel={() => user.agency === 'all' ? setSelectedAgency(null) : null}
+                  />
+                ) : gplEntryMode === 'dbis' ? (
+                  <GPLDBISForm
+                    onSubmit={handleSubmit}
+                    onCancel={() => user.agency === 'all' ? setSelectedAgency(null) : null}
+                  />
+                ) : (
+                  <DataEntryForm
+                    agency={selectedAgency}
+                    onSubmit={handleSubmit}
+                    onCancel={() => user.agency === 'all' ? setSelectedAgency(null) : null}
+                  />
+                )
               ) : (
                 <DataEntryForm
                   agency={selectedAgency}
@@ -1572,10 +1606,16 @@ export default function MinistryDashboardAdmin() {
                   Submit data before 10:00 AM for same-day dashboard updates
                 </li>
                 {selectedAgency === 'gpl' && (
-                  <li className="flex items-start gap-2">
-                    <span className="text-[#d4af37] mt-1">*</span>
-                    Use DBIS Report for detailed station-by-station entry
-                  </li>
+                  <>
+                    <li className="flex items-start gap-2">
+                      <span className="text-[#d4af37] mt-1">*</span>
+                      <strong>Excel Upload:</strong> Drag and drop the daily DBIS email attachment
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-[#d4af37] mt-1">*</span>
+                      Manual Entry for station-by-station data
+                    </li>
+                  </>
                 )}
                 <li className="flex items-start gap-2">
                   <span className="text-[#d4af37] mt-1">*</span>
