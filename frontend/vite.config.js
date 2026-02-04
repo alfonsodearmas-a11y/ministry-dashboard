@@ -4,11 +4,19 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   build: {
-    outDir: '/var/www/ministry-dashboard',
+    outDir: 'dist',
     rollupOptions: {
       input: {
         main: './index.html',
         admin: './admin.html',
+      },
+    },
+  },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
       },
     },
   },
