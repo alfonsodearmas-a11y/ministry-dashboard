@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
+    "tunnel": "gcloud compute ssh ministry-dashboard --zone=us-east1-b --project=project-0df47dd1-9c14-4fad-889 -- -N -L 5433:localhost:5432",
     "test": "jest --coverage",
     "lint": "eslint src/",
     "db:migrate": "node scripts/migrate.js",
@@ -20,10 +21,12 @@
     "express-validator": "^7.0.1",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.2",
     "nodemailer": "^7.0.13",
     "pg": "^8.11.3",
     "uuid": "^9.0.1",
-    "winston": "^3.11.0"
+    "winston": "^3.11.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "eslint": "^8.56.0",

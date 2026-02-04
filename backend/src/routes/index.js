@@ -1,15 +1,34 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
+const multer = require('multer');
 
 const { authenticate, authorize, authorizeAgency, requirePasswordChange } = require('../middleware/auth');
 const { authController } = require('../controllers/authController');
 const { metricsController } = require('../controllers/metricsController');
 const { auditService } = require('../services/auditService');
 const { emailService } = require('../services/emailService');
+const { parseGPLExcel } = require('../services/excelParser');
 const { query } = require('../config/database');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { logger } = require('../utils/logger');
+
+// Configure multer for Excel file uploads (in memory)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+      'application/vnd.ms-excel', // .xls
+    ];
+    if (allowedTypes.includes(file.mimetype) || file.originalname.match(/\.(xlsx|xls)$/i)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only Excel files (.xlsx, .xls) are allowed'), false);
+    }
+  }
+});
 
 // ============================================
 // AUTH ROUTES
@@ -285,6 +304,76 @@ router.get('/metrics/gpl/stations', metricsController.getGPLStations);
 router.get('/metrics/gpl/dbis/history',
   authenticate,
   metricsController.getGPLDBISHistory
+);
+
+// ============================================
+// GPL EXCEL UPLOAD ROUTES
+// ============================================
+
+// Parse GPL Excel file (preview without saving)
+router.post('/metrics/gpl/upload/preview',
+  authenticate,
+  authorize('data_entry', 'supervisor', 'director', 'admin'),
+  upload.single('file'),
+  asyncHandler(async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No file uploaded' });
+    }
+
+    logger.info('GPL Excel upload preview', {
+      userId: req.user?.id,
+      filename: req.file.originalname,
+      size: req.file.size
+    });
+
+    const result = parseGPLExcel(req.file.buffer);
+
+    if (!result.success) {
+      return res.status(400).json({ success: false, error: result.error || 'Failed to parse Excel file' });
+    }
+
+    res.json({
+      success: true,
+      message: 'File parsed successfully. Review the data before submitting.',
+      data: result.data
+    });
+  })
+);
+
+// Parse and submit GPL Excel file
+router.post('/metrics/gpl/upload/submit',
+  authenticate,
+  requirePasswordChange,
+  authorize('data_entry', 'supervisor', 'director', 'admin'),
+  upload.single('file'),
+  asyncHandler(async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No file uploaded' });
+    }
+
+    const result = parseGPLExcel(req.file.buffer);
+
+    if (!result.success) {
+      return res.status(400).json({ success: false, error: result.error || 'Failed to parse Excel file' });
+    }
+
+    const { apiPayload } = result.data;
+
+    // Allow overrides from request body (e.g., solar data, notes)
+    const payload = {
+      ...apiPayload,
+      hampshireSolarMwp: req.body.hampshireSolarMwp || apiPayload.hampshireSolarMwp || 0,
+      prospectSolarMwp: req.body.prospectSolarMwp || apiPayload.prospectSolarMwp || 0,
+      trafalgarSolarMwp: req.body.trafalgarSolarMwp || apiPayload.trafalgarSolarMwp || 0,
+      notes: req.body.notes || `Uploaded from Excel: ${req.file.originalname}`,
+    };
+
+    // Inject into request body for the existing controller
+    req.body = payload;
+
+    // Call the existing DBIS submit controller
+    return metricsController.submitGPLDBIS(req, res);
+  })
 );
 
 router.post('/metrics/gcaa',
