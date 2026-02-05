@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { AlertTriangle, Zap, CheckCircle, Sun, Ship, Factory, TrendingDown, Clock, Battery } from 'lucide-react';
+import GPLMonthlyKpi from '../GPLMonthlyKpi';
 
 const GPLDetail = ({ data }) => {
   // Compute all metrics from raw station data
@@ -677,6 +678,12 @@ const GPLDetail = ({ data }) => {
           <p className="text-red-400/70 text-xs sm:text-sm">Offline</p>
         </div>
       </div>
+
+      {/* Separator */}
+      <div className="border-t border-slate-700 my-6" />
+
+      {/* Monthly KPI Section */}
+      <GPLMonthlyKpi />
     </div>
   );
 };

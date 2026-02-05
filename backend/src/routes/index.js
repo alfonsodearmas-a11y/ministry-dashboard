@@ -426,6 +426,55 @@ router.post('/gpl/analysis/:uploadId/retry',
   asyncHandler(gplUploadController.retryAnalysis)
 );
 
+// ============================================
+// GPL MONTHLY KPI ROUTES
+// ============================================
+const gplKpiController = require('../controllers/gplKpiController');
+
+// Configure CSV upload for KPI files
+const kpiUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    if (file.originalname.match(/\.csv$/i)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only .csv files are allowed'), false);
+    }
+  }
+});
+
+// Upload and parse KPI CSV (preview mode)
+router.post('/gpl/kpi/upload',
+  kpiUpload.single('file'),
+  asyncHandler(gplKpiController.uploadAndPreview)
+);
+
+// Confirm and save KPI data
+router.post('/gpl/kpi/upload/confirm',
+  asyncHandler(gplKpiController.confirmUpload)
+);
+
+// Get latest month KPIs with month-over-month change
+router.get('/gpl/kpi/latest',
+  asyncHandler(gplKpiController.getLatestKpis)
+);
+
+// Get trend data for charts
+router.get('/gpl/kpi/trends',
+  asyncHandler(gplKpiController.getTrends)
+);
+
+// Get all historical KPI data
+router.get('/gpl/kpi/all',
+  asyncHandler(gplKpiController.getAllKpis)
+);
+
+// Get latest AI analysis
+router.get('/gpl/kpi/analysis',
+  asyncHandler(gplKpiController.getAnalysis)
+);
+
 router.post('/metrics/gcaa',
   authenticate,
   requirePasswordChange,
