@@ -535,6 +535,26 @@ router.post('/gpl/forecast/refresh',
   asyncHandler(gplForecastController.refreshForecasts)
 );
 
+// ============================================
+// GPL MULTIVARIATE FORECAST ROUTES (Scenario-based)
+// ============================================
+const gplMultiForecastController = require('../controllers/gplMultiForecastController');
+
+// Get latest multivariate (scenario-based) forecast
+router.get('/gpl/forecast/multivariate',
+  asyncHandler(gplMultiForecastController.getMultivariateForecast)
+);
+
+// Generate new multivariate forecast
+router.post('/gpl/forecast/multivariate/refresh',
+  asyncHandler(gplMultiForecastController.refreshMultivariateForecast)
+);
+
+// Get demand context factors
+router.get('/gpl/forecast/multivariate/context',
+  asyncHandler(gplMultiForecastController.getDemandContext)
+);
+
 router.post('/metrics/gcaa',
   authenticate,
   requirePasswordChange,

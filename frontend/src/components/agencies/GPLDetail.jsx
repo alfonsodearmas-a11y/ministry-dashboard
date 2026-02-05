@@ -7,7 +7,8 @@ import {
 import {
   AlertTriangle, Zap, CheckCircle, Sun, Ship, Factory, TrendingDown,
   TrendingUp, Clock, Battery, ChevronDown, ChevronRight, Users,
-  DollarSign, Upload, RefreshCw, Activity, Minus
+  DollarSign, Upload, RefreshCw, Activity, Minus, Info, Calendar,
+  Building2, Home, Thermometer
 } from 'lucide-react';
 import GPLKpiUpload from '../GPLKpiUpload';
 
@@ -36,6 +37,13 @@ const GPLDetail = ({ data }) => {
   const [forecastLoading, setForecastLoading] = useState(true);
   const [refreshingForecast, setRefreshingForecast] = useState(false);
 
+  // Multivariate forecast state
+  const [multiForecast, setMultiForecast] = useState(null);
+  const [multiForecastLoading, setMultiForecastLoading] = useState(true);
+  const [selectedScenario, setSelectedScenario] = useState('conservative');
+  const [methodologyExpanded, setMethodologyExpanded] = useState(false);
+  const [selectedGrid, setSelectedGrid] = useState('dbis');
+
   // Fetch KPI data
   useEffect(() => {
     async function fetchKpiData() {
@@ -63,36 +71,61 @@ const GPLDetail = ({ data }) => {
     fetchKpiData();
   }, []);
 
-  // Fetch forecast data
+  // Fetch forecast data (legacy + multivariate)
   useEffect(() => {
     async function fetchForecastData() {
       setForecastLoading(true);
+      setMultiForecastLoading(true);
       try {
-        const response = await fetch(`${API_BASE}/gpl/forecast/all`);
-        const result = await response.json();
-        if (result.success) {
-          setForecastData(result.data);
+        // Fetch both legacy and multivariate forecasts
+        const [legacyRes, multiRes] = await Promise.all([
+          fetch(`${API_BASE}/gpl/forecast/all`),
+          fetch(`${API_BASE}/gpl/forecast/multivariate`)
+        ]);
+        const [legacyData, multiData] = await Promise.all([
+          legacyRes.json(),
+          multiRes.json()
+        ]);
+
+        if (legacyData.success) {
+          setForecastData(legacyData.data);
+        }
+        if (multiData.success && multiData.hasData) {
+          setMultiForecast(multiData.forecast);
         }
       } catch (err) {
         console.error('Failed to fetch forecast data:', err);
       } finally {
         setForecastLoading(false);
+        setMultiForecastLoading(false);
       }
     }
     fetchForecastData();
   }, []);
 
-  // Refresh forecasts
+  // Refresh multivariate forecasts
   const handleRefreshForecast = async () => {
     setRefreshingForecast(true);
     try {
-      const response = await fetch(`${API_BASE}/gpl/forecast/refresh`, {
+      // Call multivariate refresh (uses Claude Opus)
+      const response = await fetch(`${API_BASE}/gpl/forecast/multivariate/refresh`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ includeAI: true })
+        headers: { 'Content-Type': 'application/json' }
       });
       const result = await response.json();
+
       if (result.success) {
+        setMultiForecast(result.forecast);
+      }
+
+      // Also refresh legacy forecasts
+      const legacyResponse = await fetch(`${API_BASE}/gpl/forecast/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ includeAI: false })
+      });
+      const legacyResult = await legacyResponse.json();
+      if (legacyResult.success) {
         const refreshed = await fetch(`${API_BASE}/gpl/forecast/all`);
         const refreshedData = await refreshed.json();
         if (refreshedData.success) {
@@ -886,158 +919,361 @@ const GPLDetail = ({ data }) => {
               </button>
             </div>
 
-            {forecastLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <RefreshCw className="w-6 h-6 text-[#64748b] animate-spin" />
+            {(forecastLoading || multiForecastLoading) ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-3">
+                <RefreshCw className="w-8 h-8 text-[#d4af37] animate-spin" />
+                <p className="text-[#94a3b8] text-sm">
+                  {refreshingForecast ? 'Generating forecast analysis with Claude Opus...' : 'Loading forecasts...'}
+                </p>
               </div>
             ) : (
               <>
-                {/* Fallback indicator */}
-                {computedProjections.usingFallback && (
-                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 flex items-center gap-2">
-                    <Activity className="w-5 h-5 text-blue-400" />
-                    <span className="text-blue-300 text-sm">
-                      Using linear projections (upload more daily DBIS data for AI-powered forecasts)
-                    </span>
+                {/* Scenario Toggle */}
+                <div className="bg-[#1a2438] rounded-xl border border-[#243049] p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <h4 className="text-[#f1f5f9] font-medium text-base mb-1">Forecast Scenario</h4>
+                      <p className="text-[#64748b] text-sm">
+                        {selectedScenario === 'conservative'
+                          ? 'Historical trend extrapolation — assumes no major demand changes'
+                          : 'Factors in oil & gas expansion, commercial growth, and housing programs'}
+                      </p>
+                    </div>
+                    <div className="flex bg-[#0f1729] rounded-lg p-1 border border-[#243049]">
+                      <button
+                        onClick={() => setSelectedScenario('conservative')}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                          selectedScenario === 'conservative'
+                            ? 'bg-[#d4af37] text-[#0f1729]'
+                            : 'text-[#94a3b8] hover:text-[#f1f5f9]'
+                        }`}
+                      >
+                        Conservative
+                      </button>
+                      <button
+                        onClick={() => setSelectedScenario('aggressive')}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                          selectedScenario === 'aggressive'
+                            ? 'bg-[#d4af37] text-[#0f1729]'
+                            : 'text-[#94a3b8] hover:text-[#f1f5f9]'
+                        }`}
+                      >
+                        Aggressive
+                      </button>
+                    </div>
                   </div>
-                )}
-
-                {/* Forecast KPI Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <ForecastMetricCard
-                    title="Projected Peak (6mo)"
-                    value={computedProjections.dbis['6mo']}
-                    unit="MW"
-                    trend={computedProjections.capacity?.find(c => c.grid === 'DBIS')?.reserve_margin_pct < 15 ? 'warning' : 'normal'}
-                  />
-                  <ForecastMetricCard
-                    title="Capacity Shortfall"
-                    value={computedProjections.capacity?.find(c => c.grid === 'DBIS')?.shortfall_date}
-                    isDate
-                    trend={computedProjections.capacity?.find(c => c.grid === 'DBIS')?.risk_level === 'critical' ? 'danger' : 'normal'}
-                  />
-                  <ForecastMetricCard
-                    title="Avg Load Shedding"
-                    value={computedProjections.loadShedding?.avg_shed_mw}
-                    unit="MW"
-                    trend={computedProjections.loadShedding?.trend === 'increasing' ? 'danger' : 'normal'}
-                  />
-                  <ForecastMetricCard
-                    title="Reserve Margin"
-                    value={computedProjections.capacity?.find(c => c.grid === 'DBIS')?.reserve_margin_pct}
-                    unit="%"
-                    trend={parseFloat(computedProjections.capacity?.find(c => c.grid === 'DBIS')?.reserve_margin_pct || 0) < 15 ? 'warning' : 'success'}
-                  />
+                  {multiForecast?.metadata?.isFallback && (
+                    <div className="mt-3 bg-blue-500/10 border border-blue-500/30 rounded-lg p-2 flex items-center gap-2">
+                      <Info className="w-4 h-4 text-blue-400" />
+                      <span className="text-blue-300 text-xs">AI forecast unavailable — showing linear extrapolation</span>
+                    </div>
+                  )}
                 </div>
 
-                {/* Demand Growth Trajectory Chart */}
+                {/* Forecast KPI Cards */}
+                {(() => {
+                  const scenario = multiForecast?.[selectedScenario] || computedProjections;
+                  const gridData = scenario?.dbis || computedProjections.dbis;
+                  const month6 = gridData?.month_6 || { peak_mw: computedProjections.dbis['6mo'], reserve_margin_pct: 0 };
+                  const breachDate = gridData?.safe_threshold_breach_date;
+                  const sheddingDate = gridData?.load_shedding_unavoidable_date;
+
+                  // Determine urgency colors
+                  const getUrgencyTrend = (dateStr) => {
+                    if (!dateStr) return 'success';
+                    const months = Math.round((new Date(dateStr) - new Date()) / (30 * 24 * 60 * 60 * 1000));
+                    if (months <= 6) return 'danger';
+                    if (months <= 12) return 'warning';
+                    return 'normal';
+                  };
+
+                  return (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <ForecastMetricCard
+                        title="Projected Peak (6mo)"
+                        value={month6.peak_mw}
+                        unit="MW"
+                        trend={month6.reserve_margin_pct < 15 ? 'warning' : 'normal'}
+                      />
+                      <ForecastMetricCard
+                        title="Reserve Margin (6mo)"
+                        value={month6.reserve_margin_pct}
+                        unit="%"
+                        trend={month6.reserve_margin_pct < 10 ? 'danger' : month6.reserve_margin_pct < 15 ? 'warning' : 'success'}
+                      />
+                      <ForecastMetricCard
+                        title="15% Threshold Breach"
+                        value={breachDate || 'Not projected'}
+                        isDate={!!breachDate}
+                        trend={getUrgencyTrend(breachDate)}
+                      />
+                      <ForecastMetricCard
+                        title="Load Shedding Risk"
+                        value={sheddingDate || 'Low risk'}
+                        isDate={!!sheddingDate}
+                        trend={getUrgencyTrend(sheddingDate)}
+                      />
+                    </div>
+                  );
+                })()}
+
+                {/* Grid Toggle for Charts */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[#94a3b8] text-sm">Grid:</span>
+                  <div className="flex bg-[#1a2438] rounded-lg p-1 border border-[#243049]">
+                    <button
+                      onClick={() => setSelectedGrid('dbis')}
+                      className={`px-3 py-1.5 rounded text-sm font-medium transition-all ${
+                        selectedGrid === 'dbis'
+                          ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                          : 'text-[#94a3b8] hover:text-[#f1f5f9]'
+                      }`}
+                    >
+                      DBIS
+                    </button>
+                    <button
+                      onClick={() => setSelectedGrid('essequibo')}
+                      className={`px-3 py-1.5 rounded text-sm font-medium transition-all ${
+                        selectedGrid === 'essequibo'
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          : 'text-[#94a3b8] hover:text-[#f1f5f9]'
+                      }`}
+                    >
+                      Essequibo
+                    </button>
+                  </div>
+                </div>
+
+                {/* Dual-Scenario Trajectory Chart */}
                 <div className="bg-[#1a2438] rounded-xl border border-[#243049] p-4">
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-[#f1f5f9] font-medium text-base">Demand Growth Trajectory</h4>
-                    {computedProjections.usingFallback && (
-                      <span className="text-xs text-blue-400 bg-blue-500/20 px-2 py-1 rounded">Linear Projection</span>
-                    )}
+                    <h4 className="text-[#f1f5f9] font-medium text-base">
+                      {selectedGrid === 'dbis' ? 'DBIS' : 'Essequibo'} Demand Trajectory
+                    </h4>
+                    <span className="text-xs text-[#64748b]">
+                      Shaded area = planning envelope
+                    </span>
                   </div>
                   <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={computedProjections.chartData}
-                        margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke="#243049" />
-                        <XAxis dataKey="period" stroke="#94a3b8" tick={{ fontSize: 13 }} />
-                        <YAxis stroke="#94a3b8" tick={{ fontSize: 13 }} />
-                        <Tooltip
-                          contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px', fontSize: '14px' }}
-                          labelStyle={{ color: '#f1f5f9' }}
-                          formatter={v => `${v.toFixed(1)} MW`}
-                        />
-                        <Legend wrapperStyle={{ fontSize: '14px' }} />
-                        <Bar dataKey="dbis" name="DBIS Grid" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="esq" name="Essequibo Grid" fill="#10b981" radius={[4, 4, 0, 0]} />
-                      </BarChart>
+                      {(() => {
+                        const conserv = multiForecast?.conservative?.[selectedGrid] || computedProjections[selectedGrid === 'dbis' ? 'dbis' : 'esq'];
+                        const aggress = multiForecast?.aggressive?.[selectedGrid] || computedProjections[selectedGrid === 'dbis' ? 'dbis' : 'esq'];
+                        const currentPeak = selectedGrid === 'dbis' ? computedProjections.currentDbis : computedProjections.currentEsq;
+                        const capacity = selectedGrid === 'dbis' ? 230 : 36;
+
+                        // Build chart data with historical + projections
+                        const chartData = [
+                          { period: 'Current', conservative: currentPeak, aggressive: currentPeak },
+                          { period: '6 mo', conservative: conserv?.month_6?.peak_mw || conserv?.['6mo'] || 0, aggressive: aggress?.month_6?.peak_mw || aggress?.['6mo'] || 0 },
+                          { period: '12 mo', conservative: conserv?.month_12?.peak_mw || conserv?.['12mo'] || 0, aggressive: aggress?.month_12?.peak_mw || aggress?.['12mo'] || 0 },
+                          { period: '18 mo', conservative: conserv?.month_18?.peak_mw || (conserv?.['12mo'] + conserv?.['6mo']) / 2 || 0, aggressive: aggress?.month_18?.peak_mw || (aggress?.['12mo'] + aggress?.['6mo']) / 2 || 0 },
+                          { period: '24 mo', conservative: conserv?.month_24?.peak_mw || conserv?.['24mo'] || 0, aggressive: aggress?.month_24?.peak_mw || aggress?.['24mo'] || 0 }
+                        ];
+
+                        return (
+                          <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#243049" />
+                            <XAxis dataKey="period" stroke="#94a3b8" tick={{ fontSize: 13 }} />
+                            <YAxis stroke="#94a3b8" tick={{ fontSize: 13 }} domain={['auto', 'auto']} />
+                            <Tooltip
+                              contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px', fontSize: '14px' }}
+                              labelStyle={{ color: '#f1f5f9' }}
+                              formatter={(v, name) => [`${v?.toFixed(1)} MW`, name === 'conservative' ? 'Conservative' : 'Aggressive']}
+                            />
+                            <Legend wrapperStyle={{ fontSize: '14px' }} />
+                            <ReferenceLine y={capacity} stroke="#ef4444" strokeDasharray="8 4" label={{ value: `Capacity: ${capacity} MW`, fill: '#ef4444', fontSize: 12, position: 'right' }} />
+                            <ReferenceLine y={capacity * 0.85} stroke="#f59e0b" strokeDasharray="4 4" label={{ value: '15% Reserve', fill: '#f59e0b', fontSize: 11, position: 'right' }} />
+                            <Area type="monotone" dataKey="aggressive" fill={selectedGrid === 'dbis' ? '#f59e0b' : '#10b981'} fillOpacity={0.1} stroke="none" />
+                            <Line type="monotone" dataKey="conservative" stroke={selectedGrid === 'dbis' ? '#f59e0b' : '#10b981'} strokeWidth={2} dot={{ fill: selectedGrid === 'dbis' ? '#f59e0b' : '#10b981', r: 4 }} name="Conservative" />
+                            <Line type="monotone" dataKey="aggressive" stroke={selectedGrid === 'dbis' ? '#fb923c' : '#34d399'} strokeWidth={2} strokeDasharray="5 5" dot={{ fill: selectedGrid === 'dbis' ? '#fb923c' : '#34d399', r: 4 }} name="Aggressive" />
+                          </ComposedChart>
+                        );
+                      })()}
                     </ResponsiveContainer>
                   </div>
                 </div>
 
-                {/* Trajectory Tables */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {/* DBIS Grid Table */}
-                  <div className="bg-[#1a2438] rounded-xl border border-[#243049] overflow-hidden">
-                    <div className="px-4 py-3 border-b border-[#243049] flex items-center justify-between">
-                      <h4 className="text-[#f1f5f9] font-medium text-base">DBIS Grid Trajectory</h4>
-                      <span className="text-[#64748b] text-sm">Growth: ~{computedProjections.dbis.growthRate.toFixed(1)} MW/month</span>
-                    </div>
-                    <table className="w-full text-base">
-                      <thead>
-                        <tr className="border-b border-[#243049]">
-                          <th className="text-left py-3 px-4 text-[#94a3b8] font-medium">Timeframe</th>
-                          <th className="text-right py-3 px-4 text-[#94a3b8] font-medium">Projected Peak</th>
-                          <th className="text-right py-3 px-4 text-[#94a3b8] font-medium">Growth</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[
-                          { period: 'Current', key: 'current' },
-                          { period: '6 months', key: '6mo' },
-                          { period: '12 months', key: '12mo' },
-                          { period: '24 months', key: '24mo' }
-                        ].map(row => {
-                          const value = row.key === 'current' ? computedProjections.currentDbis : computedProjections.dbis[row.key];
-                          const growth = row.key === 'current' ? 0 : value - computedProjections.currentDbis;
-                          const growthPct = computedProjections.currentDbis > 0 ? (growth / computedProjections.currentDbis) * 100 : 0;
-                          return (
-                            <tr key={row.period} className="border-b border-[#243049]/50">
-                              <td className="py-3 px-4 text-[#f1f5f9]">{row.period}</td>
-                              <td className="py-3 px-4 text-right text-[#f1f5f9] font-medium">{value.toFixed(1)} MW</td>
-                              <td className="py-3 px-4 text-right text-amber-400">
-                                {row.key === 'current' ? '—' : `+${growth.toFixed(1)} MW (+${growthPct.toFixed(1)}%)`}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                {/* Scenario Comparison Table */}
+                <div className="bg-[#1a2438] rounded-xl border border-[#243049] overflow-hidden">
+                  <div className="px-4 py-3 border-b border-[#243049]">
+                    <h4 className="text-[#f1f5f9] font-medium text-base">Scenario Comparison — {selectedGrid === 'dbis' ? 'DBIS Grid' : 'Essequibo Grid'}</h4>
                   </div>
-
-                  {/* Essequibo Grid Table */}
-                  <div className="bg-[#1a2438] rounded-xl border border-[#243049] overflow-hidden">
-                    <div className="px-4 py-3 border-b border-[#243049] flex items-center justify-between">
-                      <h4 className="text-[#f1f5f9] font-medium text-base">Essequibo Grid Trajectory</h4>
-                      <span className="text-[#64748b] text-sm">Growth: ~{computedProjections.esq.growthRate.toFixed(2)} MW/month</span>
-                    </div>
-                    <table className="w-full text-base">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
                       <thead>
-                        <tr className="border-b border-[#243049]">
+                        <tr className="border-b border-[#243049] bg-[#0f1729]">
                           <th className="text-left py-3 px-4 text-[#94a3b8] font-medium">Timeframe</th>
-                          <th className="text-right py-3 px-4 text-[#94a3b8] font-medium">Projected Peak</th>
-                          <th className="text-right py-3 px-4 text-[#94a3b8] font-medium">Growth</th>
+                          <th className="text-right py-3 px-4 text-[#94a3b8] font-medium">Conservative Peak</th>
+                          <th className="text-right py-3 px-4 text-[#94a3b8] font-medium">Aggressive Peak</th>
+                          <th className="text-right py-3 px-4 text-[#94a3b8] font-medium">Capacity</th>
+                          <th className="text-right py-3 px-4 text-[#94a3b8] font-medium">Cons. Reserve</th>
+                          <th className="text-right py-3 px-4 text-[#94a3b8] font-medium">Aggr. Reserve</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {[
-                          { period: 'Current', key: 'current' },
-                          { period: '6 months', key: '6mo' },
-                          { period: '12 months', key: '12mo' },
-                          { period: '24 months', key: '24mo' }
-                        ].map(row => {
-                          const value = row.key === 'current' ? computedProjections.currentEsq : computedProjections.esq[row.key];
-                          const growth = row.key === 'current' ? 0 : value - computedProjections.currentEsq;
-                          const growthPct = computedProjections.currentEsq > 0 ? (growth / computedProjections.currentEsq) * 100 : 0;
-                          return (
-                            <tr key={row.period} className="border-b border-[#243049]/50">
-                              <td className="py-3 px-4 text-[#f1f5f9]">{row.period}</td>
-                              <td className="py-3 px-4 text-right text-[#f1f5f9] font-medium">{value.toFixed(1)} MW</td>
-                              <td className="py-3 px-4 text-right text-emerald-400">
-                                {row.key === 'current' ? '—' : `+${growth.toFixed(1)} MW (+${growthPct.toFixed(1)}%)`}
-                              </td>
-                            </tr>
-                          );
-                        })}
+                        {(() => {
+                          const conserv = multiForecast?.conservative?.[selectedGrid] || {};
+                          const aggress = multiForecast?.aggressive?.[selectedGrid] || {};
+                          const capacity = selectedGrid === 'dbis' ? 230 : 36;
+                          const currentPeak = selectedGrid === 'dbis' ? computedProjections.currentDbis : computedProjections.currentEsq;
+
+                          const rows = [
+                            { period: 'Current', cKey: 'current_peak', aKey: 'current_peak', fallbackC: currentPeak, fallbackA: currentPeak },
+                            { period: '6 months', cKey: 'month_6', aKey: 'month_6', fallbackC: computedProjections[selectedGrid === 'dbis' ? 'dbis' : 'esq']['6mo'], fallbackA: computedProjections[selectedGrid === 'dbis' ? 'dbis' : 'esq']['6mo'] * 1.5 },
+                            { period: '12 months', cKey: 'month_12', aKey: 'month_12', fallbackC: computedProjections[selectedGrid === 'dbis' ? 'dbis' : 'esq']['12mo'], fallbackA: computedProjections[selectedGrid === 'dbis' ? 'dbis' : 'esq']['12mo'] * 1.5 },
+                            { period: '18 months', cKey: 'month_18', aKey: 'month_18', fallbackC: (computedProjections[selectedGrid === 'dbis' ? 'dbis' : 'esq']['12mo'] + computedProjections[selectedGrid === 'dbis' ? 'dbis' : 'esq']['24mo']) / 2, fallbackA: ((computedProjections[selectedGrid === 'dbis' ? 'dbis' : 'esq']['12mo'] + computedProjections[selectedGrid === 'dbis' ? 'dbis' : 'esq']['24mo']) / 2) * 1.5 },
+                            { period: '24 months', cKey: 'month_24', aKey: 'month_24', fallbackC: computedProjections[selectedGrid === 'dbis' ? 'dbis' : 'esq']['24mo'], fallbackA: computedProjections[selectedGrid === 'dbis' ? 'dbis' : 'esq']['24mo'] * 1.5 }
+                          ];
+
+                          const getReserveClass = (reserve) => {
+                            if (reserve >= 20) return 'text-emerald-400 bg-emerald-500/10';
+                            if (reserve >= 15) return 'text-amber-400 bg-amber-500/10';
+                            return 'text-red-400 bg-red-500/10';
+                          };
+
+                          return rows.map(row => {
+                            const cPeak = row.cKey === 'current_peak' ? (conserv[row.cKey] || row.fallbackC) : (conserv[row.cKey]?.peak_mw || row.fallbackC);
+                            const aPeak = row.aKey === 'current_peak' ? (aggress[row.aKey] || row.fallbackA) : (aggress[row.aKey]?.peak_mw || row.fallbackA);
+                            const cReserve = ((capacity - cPeak) / capacity) * 100;
+                            const aReserve = ((capacity - aPeak) / capacity) * 100;
+
+                            return (
+                              <tr key={row.period} className="border-b border-[#243049]/50">
+                                <td className="py-3 px-4 text-[#f1f5f9] font-medium">{row.period}</td>
+                                <td className="py-3 px-4 text-right text-[#f1f5f9]">{cPeak?.toFixed(1)} MW</td>
+                                <td className="py-3 px-4 text-right text-[#f1f5f9]">{aPeak?.toFixed(1)} MW</td>
+                                <td className="py-3 px-4 text-right text-[#64748b]">{capacity} MW</td>
+                                <td className={`py-3 px-4 text-right font-medium rounded ${getReserveClass(cReserve)}`}>{cReserve.toFixed(1)}%</td>
+                                <td className={`py-3 px-4 text-right font-medium rounded ${getReserveClass(aReserve)}`}>{aReserve.toFixed(1)}%</td>
+                              </tr>
+                            );
+                          });
+                        })()}
                       </tbody>
                     </table>
                   </div>
                 </div>
+
+                {/* Demand Drivers */}
+                {multiForecast?.demand_drivers && (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {[
+                      { key: 'industrial', icon: Factory, color: 'text-amber-400', bg: 'bg-amber-500/10' },
+                      { key: 'commercial', icon: Building2, color: 'text-blue-400', bg: 'bg-blue-500/10' },
+                      { key: 'residential', icon: Home, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+                      { key: 'seasonal', icon: Thermometer, color: 'text-purple-400', bg: 'bg-purple-500/10' }
+                    ].map(({ key, icon: Icon, color, bg }) => {
+                      const driver = multiForecast.demand_drivers[key];
+                      if (!driver) return null;
+                      return (
+                        <div key={key} className={`${bg} rounded-xl border border-[#243049] p-4`}>
+                          <div className="flex items-center gap-2 mb-2">
+                            <Icon className={`w-5 h-5 ${color}`} />
+                            <span className={`text-sm font-medium ${color} capitalize`}>{key}</span>
+                          </div>
+                          <p className="text-[#f1f5f9] text-xs font-medium mb-1">{driver.impact}</p>
+                          <p className="text-[#64748b] text-xs">{driver.factors?.slice(0, 2).join(', ')}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Methodology & Assumptions Panel */}
+                <div className="bg-[#1a2438] rounded-xl border border-[#243049] overflow-hidden">
+                  <button
+                    onClick={() => setMethodologyExpanded(!methodologyExpanded)}
+                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-[#243049]/30 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center">
+                        <Info className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="text-left">
+                        <h3 className="text-[#f1f5f9] font-medium text-base">Forecast Methodology</h3>
+                        <p className="text-[#64748b] text-sm">Click to {methodologyExpanded ? 'collapse' : 'expand'}</p>
+                      </div>
+                    </div>
+                    <ChevronDown className={`text-[#64748b] transition-transform ${methodologyExpanded ? 'rotate-180' : ''}`} size={18} />
+                  </button>
+
+                  {methodologyExpanded && (
+                    <div className="px-4 pb-4 space-y-4">
+                      {/* Methodology Summary */}
+                      <div className="bg-[#0f1729] rounded-lg p-4 border border-[#243049]">
+                        <p className="text-blue-400 text-sm font-medium mb-2">Methodology</p>
+                        <p className="text-[#94a3b8] text-sm leading-relaxed">
+                          {multiForecast?.methodology_summary || 'Linear extrapolation based on historical monthly growth rates.'}
+                        </p>
+                      </div>
+
+                      {/* Assumptions for Selected Scenario */}
+                      <div className="bg-[#0f1729] rounded-lg p-4 border border-[#243049]">
+                        <p className="text-blue-400 text-sm font-medium mb-2">
+                          {selectedScenario === 'conservative' ? 'Conservative' : 'Aggressive'} Assumptions
+                        </p>
+                        <ul className="space-y-1">
+                          {(multiForecast?.[selectedScenario]?.assumptions || []).map((assumption, i) => (
+                            <li key={i} className="text-[#94a3b8] text-sm flex items-start gap-2">
+                              <span className="text-blue-400">•</span>
+                              <span>{assumption}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      {/* Risk Factors */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-red-500/10 rounded-lg p-4 border border-red-500/20">
+                          <p className="text-red-400 text-sm font-medium mb-2">Upside Risk Factors</p>
+                          <ul className="space-y-1">
+                            {(multiForecast?.[selectedScenario]?.risk_factors_upside || []).map((factor, i) => (
+                              <li key={i} className="text-[#94a3b8] text-xs flex items-start gap-2">
+                                <TrendingUp className="w-3 h-3 text-red-400 mt-0.5" />
+                                <span>{factor}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                        <div className="bg-emerald-500/10 rounded-lg p-4 border border-emerald-500/20">
+                          <p className="text-emerald-400 text-sm font-medium mb-2">Moderating Factors</p>
+                          <ul className="space-y-1">
+                            {(multiForecast?.[selectedScenario]?.moderating_factors || []).map((factor, i) => (
+                              <li key={i} className="text-[#94a3b8] text-xs flex items-start gap-2">
+                                <TrendingDown className="w-3 h-3 text-emerald-400 mt-0.5" />
+                                <span>{factor}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+
+                      {/* Disclaimer */}
+                      <div className="bg-[#0f1729] rounded-lg p-3 border border-[#243049]">
+                        <p className="text-[#64748b] text-xs">
+                          Projections generated by {multiForecast?.metadata?.isFallback ? 'linear extrapolation' : 'AI analysis (Claude Opus)'} of historical GPL data supplemented with macroeconomic context.
+                          Actual demand will vary. Updated: {multiForecast?.metadata?.generatedAt ? new Date(multiForecast.metadata.generatedAt).toLocaleString() : 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Executive Summary */}
+                {multiForecast?.executive_summary && (
+                  <div className="bg-gradient-to-r from-[#1a2438] to-[#243049] rounded-xl border border-[#d4af37]/30 p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-[#d4af37]/20 flex items-center justify-center flex-shrink-0">
+                        <Zap className="w-5 h-5 text-[#d4af37]" />
+                      </div>
+                      <div>
+                        <h4 className="text-[#d4af37] font-medium text-sm mb-1">Executive Summary</h4>
+                        <p className="text-[#f1f5f9] text-sm leading-relaxed">{multiForecast.executive_summary}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </div>
