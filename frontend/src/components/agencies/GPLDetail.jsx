@@ -502,6 +502,78 @@ const GPLDetail = ({ data }) => {
         </div>
       </details>
 
+      {/* AI Executive Briefing */}
+      {data.aiAnalysis && data.aiAnalysis.analysis_status === 'completed' && data.aiAnalysis.executive_briefing && !data.aiAnalysis.executive_briefing.includes('failed') && (
+        <details className="bg-purple-500/[0.08] border border-purple-500/30 rounded-xl overflow-hidden" open>
+          <summary className="px-3 sm:px-4 py-3 cursor-pointer hover:bg-purple-500/[0.05] transition-colors">
+            <div className="flex items-center justify-between">
+              <span className="text-purple-300 font-semibold text-sm sm:text-base flex items-center gap-2">
+                <Battery size={16} className="text-purple-400" />
+                AI Executive Briefing
+              </span>
+              <span className="text-purple-400/60 text-xs">Click to expand</span>
+            </div>
+          </summary>
+          <div className="px-3 sm:px-4 pb-4 space-y-4">
+            {/* Executive Summary */}
+            <div className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">
+              {data.aiAnalysis.executive_briefing}
+            </div>
+
+            {/* Critical Alerts */}
+            {data.aiAnalysis.critical_alerts && data.aiAnalysis.critical_alerts.length > 0 && (
+              <div>
+                <h4 className="text-red-400 text-xs font-semibold mb-2 uppercase tracking-wider">Critical Alerts</h4>
+                <div className="space-y-2">
+                  {data.aiAnalysis.critical_alerts.map((alert, i) => (
+                    <div key={i} className="p-2 bg-red-500/10 border border-red-500/30 rounded-lg">
+                      <p className="text-red-300 text-sm font-medium">{alert.title}</p>
+                      <p className="text-slate-400 text-xs mt-1">{alert.description}</p>
+                      {alert.recommendation && (
+                        <p className="text-slate-500 text-xs mt-1 italic">→ {alert.recommendation}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Station Concerns */}
+            {data.aiAnalysis.station_concerns && data.aiAnalysis.station_concerns.length > 0 && (
+              <div>
+                <h4 className="text-amber-400 text-xs font-semibold mb-2 uppercase tracking-wider">Station Concerns</h4>
+                <div className="space-y-2">
+                  {data.aiAnalysis.station_concerns.map((concern, i) => (
+                    <div key={i} className="p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                      <p className="text-amber-300 text-sm font-medium">{concern.station}</p>
+                      <p className="text-slate-400 text-xs mt-1">{concern.issue}</p>
+                      {concern.impact && (
+                        <p className="text-slate-500 text-xs mt-1">Impact: {concern.impact}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Recommendations */}
+            {data.aiAnalysis.recommendations && data.aiAnalysis.recommendations.length > 0 && (
+              <div>
+                <h4 className="text-blue-400 text-xs font-semibold mb-2 uppercase tracking-wider">Recommendations</h4>
+                <ul className="space-y-1">
+                  {data.aiAnalysis.recommendations.map((rec, i) => (
+                    <li key={i} className="text-slate-400 text-xs flex items-start gap-2">
+                      <span className="text-blue-400 mt-0.5">•</span>
+                      <span>{rec.recommendation}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </details>
+      )}
+
       {/* Status Summary - Mobile optimized 2x2 grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
         <div className="bg-emerald-500/[0.08] border border-emerald-500/30 rounded-xl p-3 sm:p-4 text-center">

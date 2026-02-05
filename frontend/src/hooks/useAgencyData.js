@@ -1,6 +1,61 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { generateAgencyData, getSparklineData } from '../data/mockData';
 import { Plane, Droplets, Zap, Shield } from 'lucide-react';
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
+
+// Transform API response to match expected GPL data structure
+const transformGPLData = (apiData) => {
+  if (!apiData?.stations || !apiData?.summary) {
+    return null;
+  }
+
+  const { summary, stations, units, analysis } = apiData;
+
+  // Build power stations array from stations data
+  const powerStations = stations.map(station => {
+    // Find units for this station
+    const stationUnits = units?.filter(u => u.station === station.station_name) || [];
+    const onlineUnits = stationUnits.filter(u => u.status === 'online').length;
+    const totalUnits = stationUnits.length || station.total_units || 0;
+
+    return {
+      code: station.station_name?.toUpperCase().replace(/\s+/g, '_') || 'UNKNOWN',
+      name: station.station_name || 'Unknown',
+      type: 'fossil',
+      units: totalUnits,
+      onlineUnits,
+      derated: parseFloat(station.total_derated_capacity_mw) || 0,
+      available: parseFloat(station.total_available_mw) || 0,
+    };
+  });
+
+  // Solar stations
+  const solarStations = [
+    { name: 'Hampshire Solar', capacity: parseFloat(summary.solar_hampshire_mwp) || 0 },
+    { name: 'Prospect Solar', capacity: parseFloat(summary.solar_prospect_mwp) || 0 },
+    { name: 'Trafalgar Solar', capacity: parseFloat(summary.solar_trafalgar_mwp) || 0 },
+  ].filter(s => s.capacity > 0);
+
+  return {
+    powerStations,
+    solarStations,
+    totalRenewableCapacity: parseFloat(summary.total_renewable_mwp) || 0,
+    forcedOutageRate: parseFloat(summary.average_for) * 100 || 7.5,
+    expectedPeakDemand: parseFloat(summary.expected_peak_demand_mw) || 200,
+    actualEveningPeak: {
+      onBars: parseFloat(summary.evening_peak_on_bars_mw) || 0,
+      suppressed: parseFloat(summary.evening_peak_suppressed_mw) || 0,
+    },
+    actualDayPeak: {
+      onBars: parseFloat(summary.day_peak_on_bars_mw) || 0,
+      suppressed: parseFloat(summary.day_peak_suppressed_mw) || 0,
+    },
+    reportDate: summary.report_date,
+    // AI Analysis
+    aiAnalysis: analysis || null,
+  };
+};
 
 const AGENCY_CONFIG = {
   cjia: {
@@ -225,15 +280,59 @@ export const useAgencyData = () => {
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [isLoading, setIsLoading] = useState(false);
 
-  const refresh = useCallback(() => {
-    setIsLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setRawData(generateAgencyData());
-      setLastUpdated(new Date());
-      setIsLoading(false);
-    }, 800);
+  // Fetch GPL data from API
+  const fetchGPLData = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE}/gpl/latest`);
+      if (!response.ok) {
+        console.warn('Failed to fetch GPL data:', response.status);
+        return null;
+      }
+      const data = await response.json();
+
+      // Also fetch AI analysis if we have an upload_id
+      let analysis = null;
+      if (data.summary?.upload_id) {
+        try {
+          const analysisResponse = await fetch(`${API_BASE}/gpl/analysis/${data.summary.upload_id}`);
+          if (analysisResponse.ok) {
+            analysis = await analysisResponse.json();
+          }
+        } catch (err) {
+          console.warn('Failed to fetch AI analysis:', err);
+        }
+      }
+
+      return transformGPLData({ ...data, analysis });
+    } catch (err) {
+      console.warn('Error fetching GPL data:', err);
+      return null;
+    }
   }, []);
+
+  const refresh = useCallback(async () => {
+    setIsLoading(true);
+
+    // Fetch real GPL data
+    const gplData = await fetchGPLData();
+
+    // Get mock data for other agencies
+    const mockData = generateAgencyData();
+
+    // Merge real GPL data with mock data for other agencies
+    setRawData(prev => ({
+      ...mockData,
+      gpl: gplData || mockData.gpl,
+    }));
+
+    setLastUpdated(new Date());
+    setIsLoading(false);
+  }, [fetchGPLData]);
+
+  // Fetch data on initial mount
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   // Build enriched agency objects
   const agencies = Object.keys(AGENCY_CONFIG).map(id => {
