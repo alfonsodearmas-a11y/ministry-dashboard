@@ -372,12 +372,25 @@ const GPLDetail = ({ data }) => {
       {/* Generation Capacity Chart */}
       <div className="bg-[#1a2438] rounded-xl p-4 sm:p-5 border border-[#243049]">
         <h4 className="text-[#f1f5f9] font-medium mb-4 text-sm sm:text-base">Generation Capacity by Station</h4>
-        <div className="h-64 sm:h-80">
+        <div style={{ height: Math.max(400, summary.stations.length * 40) }}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={summary.stations} layout="vertical" margin={{ left: 0, right: 20 }}>
+            <BarChart
+              data={summary.stations}
+              layout="vertical"
+              margin={{ left: 10, right: 20, top: 10, bottom: 10 }}
+              barGap={2}
+              barCategoryGap="20%"
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="#243049" horizontal={false} />
-              <XAxis type="number" stroke="#94a3b8" tick={{ fontSize: 10 }} domain={[0, 80]} />
-              <YAxis type="category" dataKey="name" stroke="#94a3b8" tick={{ fontSize: 10 }} width={65} />
+              <XAxis type="number" stroke="#94a3b8" tick={{ fontSize: 11 }} domain={[0, 80]} />
+              <YAxis
+                type="category"
+                dataKey="name"
+                stroke="#94a3b8"
+                tick={{ fontSize: 11 }}
+                width={85}
+                tickLine={false}
+              />
               <Tooltip
                 contentStyle={{ backgroundColor: '#1a2438', border: '1px solid #243049', borderRadius: '8px', fontSize: '12px' }}
                 formatter={(value, name, props) => {
@@ -386,8 +399,8 @@ const GPLDetail = ({ data }) => {
                   return [`${value} MW (${station.availability.toFixed(0)}%)`, 'Available'];
                 }}
               />
-              <Bar dataKey="derated" fill="#243049" radius={[0, 4, 4, 0]} name="Derated" />
-              <Bar dataKey="available" radius={[0, 4, 4, 0]} name="Available">
+              <Bar dataKey="derated" fill="#243049" radius={[0, 4, 4, 0]} name="Derated" barSize={14} />
+              <Bar dataKey="available" radius={[0, 4, 4, 0]} name="Available" barSize={14}>
                 {summary.stations.map((station, index) => (
                   <Cell key={`cell-${index}`} fill={getBarColor(station.status)} />
                 ))}
