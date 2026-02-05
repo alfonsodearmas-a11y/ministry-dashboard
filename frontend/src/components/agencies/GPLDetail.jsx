@@ -723,12 +723,29 @@ const GPLDetail = ({ data }) => {
 
             {showKpiUpload && (
               <GPLKpiUpload
-                onSuccess={() => {
+                onSuccess={async () => {
                   setShowKpiUpload(false);
-                  // Refetch KPI data
-                  fetch(`${API_BASE}/gpl/kpi/latest`).then(r => r.json()).then(d => {
-                    if (d.success && d.hasData) setKpiData(prev => ({ ...prev, latest: d }));
-                  });
+                  setKpiLoading(true);
+                  try {
+                    // Refetch all KPI data after upload
+                    const [latestRes, trendsRes, analysisRes] = await Promise.all([
+                      fetch(`${API_BASE}/gpl/kpi/latest`),
+                      fetch(`${API_BASE}/gpl/kpi/trends?months=12`),
+                      fetch(`${API_BASE}/gpl/kpi/analysis`)
+                    ]);
+                    const [latestData, trendsData, analysisData] = await Promise.all([
+                      latestRes.json(), trendsRes.json(), analysisRes.json()
+                    ]);
+                    setKpiData({
+                      latest: latestData.success && latestData.hasData ? latestData : null,
+                      trends: trendsData.success ? trendsData.trends : [],
+                      analysis: analysisData.success && analysisData.hasAnalysis ? analysisData.analysis : null
+                    });
+                  } catch (err) {
+                    console.error('Failed to refresh KPI data:', err);
+                  } finally {
+                    setKpiLoading(false);
+                  }
                 }}
                 onCancel={() => setShowKpiUpload(false)}
               />
