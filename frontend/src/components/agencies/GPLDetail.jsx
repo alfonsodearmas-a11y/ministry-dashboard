@@ -392,12 +392,21 @@ const GPLDetail = ({ data }) => {
                 tickLine={false}
               />
               <Tooltip
-                contentStyle={{ backgroundColor: '#1a2438', border: '1px solid #243049', borderRadius: '8px', fontSize: '12px' }}
+                contentStyle={{
+                  backgroundColor: '#0f172a',
+                  border: '1px solid #334155',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
+                }}
+                labelStyle={{ color: '#f1f5f9', fontWeight: 600, marginBottom: '4px' }}
+                itemStyle={{ color: '#94a3b8' }}
                 formatter={(value, name, props) => {
                   const station = props.payload;
-                  if (name === 'derated') return [`${value} MW`, 'Derated'];
+                  if (name === 'derated') return [`${value} MW`, 'Derated Capacity'];
                   return [`${value} MW (${station.availability.toFixed(0)}%)`, 'Available'];
                 }}
+                cursor={{ fill: 'rgba(148, 163, 184, 0.1)' }}
               />
               <Bar dataKey="derated" fill="#243049" radius={[0, 4, 4, 0]} name="Derated" barSize={14} />
               <Bar dataKey="available" radius={[0, 4, 4, 0]} name="Available" barSize={14}>
