@@ -452,59 +452,38 @@ const GPLDetail = ({ data }) => {
         {/* ===================== TAB 1: SYSTEM OVERVIEW ===================== */}
         {activeTab === 'overview' && (
           <div className="space-y-4">
-            {/* Active Alerts */}
+            {/* Active Alerts - Compact List */}
             <div className="bg-[#1a2438] rounded-xl border border-[#243049] overflow-hidden">
-              <div className="px-4 py-3 border-b border-[#243049] flex items-center justify-between">
+              <div className="px-4 py-2.5 border-b border-[#243049] flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <AlertTriangle className="text-amber-400" size={18} />
-                  <h3 className="text-[#f1f5f9] font-medium text-base">Active Alerts</h3>
+                  <AlertTriangle className="text-amber-400" size={16} />
+                  <h3 className="text-[#f1f5f9] font-medium text-sm">Active Alerts</h3>
                   {criticalCount > 0 && (
-                    <span className="bg-red-500/20 text-red-400 text-sm px-2 py-0.5 rounded-full font-medium">
-                      {criticalCount} critical
+                    <span className="bg-red-500/20 text-red-400 text-xs px-1.5 py-0.5 rounded-full font-medium">
+                      {criticalCount}
                     </span>
                   )}
                 </div>
+                <span className="text-[#64748b] text-xs">{consolidatedAlerts.length} total</span>
               </div>
-              <div className="max-h-64 overflow-y-auto">
+              <div className="max-h-48 overflow-y-auto">
                 {consolidatedAlerts.length === 0 ? (
-                  <div className="p-4 text-center text-[#64748b] text-base">No active alerts</div>
+                  <div className="p-3 text-center text-[#64748b] text-sm">No active alerts</div>
                 ) : (
-                  consolidatedAlerts.slice(0, 8).map(alert => (
+                  consolidatedAlerts.slice(0, 6).map(alert => (
                     <div
                       key={alert.id}
-                      className="px-4 py-3 border-b border-[#243049]/50 hover:bg-[#243049]/30 cursor-pointer"
-                      onClick={() => setExpandedAlerts(prev => ({ ...prev, [alert.id]: !prev[alert.id] }))}
+                      className="px-3 py-2 border-b border-[#243049]/30 hover:bg-[#243049]/30 flex items-center gap-2"
                     >
-                      <div className="flex items-start gap-3">
-                        <div className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${
-                          alert.severity === 'critical' ? 'bg-red-500' :
-                          alert.severity === 'high' ? 'bg-orange-500' :
-                          alert.severity === 'medium' ? 'bg-blue-500' : 'bg-slate-500'
-                        }`} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-[#f1f5f9] text-base font-medium">{alert.title}</span>
-                            {alert.station && (
-                              <span className="text-sm px-2 py-0.5 rounded bg-[#243049] text-[#94a3b8]">{alert.station}</span>
-                            )}
-                          </div>
-                          {alert.detail && !expandedAlerts[alert.id] && (
-                            <p className="text-[#64748b] text-sm mt-1">{alert.detail}</p>
-                          )}
-                          {expandedAlerts[alert.id] && (
-                            <div className="mt-2 space-y-2">
-                              {alert.detail && <p className="text-[#94a3b8] text-sm">{alert.detail}</p>}
-                              {alert.recommendation && (
-                                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
-                                  <p className="text-blue-400 text-sm font-medium">Recommended Action:</p>
-                                  <p className="text-[#94a3b8] text-sm mt-1">{alert.recommendation}</p>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        <ChevronRight className={`text-[#64748b] flex-shrink-0 transition-transform ${expandedAlerts[alert.id] ? 'rotate-90' : ''}`} size={16} />
-                      </div>
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                        alert.severity === 'critical' ? 'bg-red-500' :
+                        alert.severity === 'high' ? 'bg-orange-500' :
+                        alert.severity === 'medium' ? 'bg-blue-500' : 'bg-slate-500'
+                      }`} />
+                      <span className="text-[#e2e8f0] text-sm flex-1 truncate">{alert.title}</span>
+                      {alert.station && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-[#243049] text-[#94a3b8] flex-shrink-0">{alert.station}</span>
+                      )}
                     </div>
                   ))
                 )}
