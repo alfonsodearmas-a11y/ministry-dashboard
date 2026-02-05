@@ -972,16 +972,41 @@ const GPLDetail = ({ data }) => {
 
                 {/* Forecast KPI Cards */}
                 {(() => {
-                  const scenario = multiForecast?.[selectedScenario] || computedProjections;
-                  const gridData = scenario?.dbis || computedProjections.dbis;
-                  const month6 = gridData?.month_6 || { peak_mw: computedProjections.dbis['6mo'], reserve_margin_pct: 0 };
-                  const breachDate = gridData?.safe_threshold_breach_date;
-                  const sheddingDate = gridData?.load_shedding_unavoidable_date;
+                  // Get scenario data from multivariate forecast
+                  const scenarioData = multiForecast?.[selectedScenario];
+                  const gridData = scenarioData?.dbis;
+
+                  // Get 6-month projection data
+                  const month6Data = gridData?.month_6;
+                  const currentPeak = gridData?.current_peak || computedProjections.currentDbis;
+                  const capacity = 230; // DBIS capacity
+
+                  // Calculate values with proper fallbacks
+                  let peakMw = month6Data?.peak_mw;
+                  let reserveMargin = month6Data?.reserve_margin_pct;
+
+                  // If no multivariate data, use computed projections
+                  if (peakMw === undefined || peakMw === null) {
+                    peakMw = computedProjections.dbis['6mo'];
+                    reserveMargin = ((capacity - peakMw) / capacity) * 100;
+                  }
+
+                  // Ensure reserve margin is a valid number
+                  if (reserveMargin === undefined || reserveMargin === null || isNaN(reserveMargin)) {
+                    reserveMargin = ((capacity - peakMw) / capacity) * 100;
+                  }
+
+                  const breachDate = gridData?.safe_threshold_breach_date || null;
+                  const sheddingDate = gridData?.load_shedding_unavoidable_date || null;
 
                   // Determine urgency colors
                   const getUrgencyTrend = (dateStr) => {
                     if (!dateStr) return 'success';
-                    const months = Math.round((new Date(dateStr) - new Date()) / (30 * 24 * 60 * 60 * 1000));
+                    // Parse YYYY-MM format
+                    const match = String(dateStr).match(/^(\d{4})-(\d{2})$/);
+                    if (!match) return 'normal';
+                    const targetDate = new Date(parseInt(match[1]), parseInt(match[2]) - 1);
+                    const months = Math.round((targetDate - new Date()) / (30 * 24 * 60 * 60 * 1000));
                     if (months <= 6) return 'danger';
                     if (months <= 12) return 'warning';
                     return 'normal';
@@ -991,15 +1016,15 @@ const GPLDetail = ({ data }) => {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <ForecastMetricCard
                         title="Projected Peak (6mo)"
-                        value={month6.peak_mw}
-                        unit="MW"
-                        trend={month6.reserve_margin_pct < 15 ? 'warning' : 'normal'}
+                        value={peakMw}
+                        unit=" MW"
+                        trend={reserveMargin < 15 ? 'warning' : 'normal'}
                       />
                       <ForecastMetricCard
                         title="Reserve Margin (6mo)"
-                        value={month6.reserve_margin_pct}
+                        value={reserveMargin}
                         unit="%"
-                        trend={month6.reserve_margin_pct < 10 ? 'danger' : month6.reserve_margin_pct < 15 ? 'warning' : 'success'}
+                        trend={reserveMargin < 10 ? 'danger' : reserveMargin < 15 ? 'warning' : 'success'}
                       />
                       <ForecastMetricCard
                         title="15% Threshold Breach"
@@ -1057,18 +1082,42 @@ const GPLDetail = ({ data }) => {
                   <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
                       {(() => {
-                        const conserv = multiForecast?.conservative?.[selectedGrid] || computedProjections[selectedGrid === 'dbis' ? 'dbis' : 'esq'];
-                        const aggress = multiForecast?.aggressive?.[selectedGrid] || computedProjections[selectedGrid === 'dbis' ? 'dbis' : 'esq'];
+                        const conservData = multiForecast?.conservative?.[selectedGrid];
+                        const aggressData = multiForecast?.aggressive?.[selectedGrid];
+                        const fallbackData = computedProjections[selectedGrid === 'dbis' ? 'dbis' : 'esq'];
                         const currentPeak = selectedGrid === 'dbis' ? computedProjections.currentDbis : computedProjections.currentEsq;
                         const capacity = selectedGrid === 'dbis' ? 230 : 36;
+
+                        // Helper to calculate aggressive fallback properly: current + 1.5x growth
+                        const calcAggressiveFallback = (conservativePeak) => {
+                          const growth = conservativePeak - currentPeak;
+                          return currentPeak + (growth * 1.5);
+                        };
+
+                        // Get conservative peak with fallback
+                        const getConservPeak = (monthKey, fallbackKey) => {
+                          if (conservData?.[monthKey]?.peak_mw != null) return conservData[monthKey].peak_mw;
+                          return fallbackData?.[fallbackKey] || currentPeak;
+                        };
+
+                        // Get aggressive peak with fallback
+                        const getAggressPeak = (monthKey, conservPeak) => {
+                          if (aggressData?.[monthKey]?.peak_mw != null) return aggressData[monthKey].peak_mw;
+                          return calcAggressiveFallback(conservPeak);
+                        };
+
+                        const c6 = getConservPeak('month_6', '6mo');
+                        const c12 = getConservPeak('month_12', '12mo');
+                        const c18 = conservData?.month_18?.peak_mw ?? (c6 + c12) / 2 + (c12 - c6) / 2;
+                        const c24 = getConservPeak('month_24', '24mo');
 
                         // Build chart data with historical + projections
                         const chartData = [
                           { period: 'Current', conservative: currentPeak, aggressive: currentPeak },
-                          { period: '6 mo', conservative: conserv?.month_6?.peak_mw || conserv?.['6mo'] || 0, aggressive: aggress?.month_6?.peak_mw || aggress?.['6mo'] || 0 },
-                          { period: '12 mo', conservative: conserv?.month_12?.peak_mw || conserv?.['12mo'] || 0, aggressive: aggress?.month_12?.peak_mw || aggress?.['12mo'] || 0 },
-                          { period: '18 mo', conservative: conserv?.month_18?.peak_mw || (conserv?.['12mo'] + conserv?.['6mo']) / 2 || 0, aggressive: aggress?.month_18?.peak_mw || (aggress?.['12mo'] + aggress?.['6mo']) / 2 || 0 },
-                          { period: '24 mo', conservative: conserv?.month_24?.peak_mw || conserv?.['24mo'] || 0, aggressive: aggress?.month_24?.peak_mw || aggress?.['24mo'] || 0 }
+                          { period: '6 mo', conservative: c6, aggressive: getAggressPeak('month_6', c6) },
+                          { period: '12 mo', conservative: c12, aggressive: getAggressPeak('month_12', c12) },
+                          { period: '18 mo', conservative: c18, aggressive: getAggressPeak('month_18', c18) },
+                          { period: '24 mo', conservative: c24, aggressive: getAggressPeak('month_24', c24) }
                         ];
 
                         return (
@@ -1084,7 +1133,7 @@ const GPLDetail = ({ data }) => {
                             <Legend wrapperStyle={{ fontSize: '14px' }} />
                             <ReferenceLine y={capacity} stroke="#ef4444" strokeDasharray="8 4" label={{ value: `Capacity: ${capacity} MW`, fill: '#ef4444', fontSize: 12, position: 'right' }} />
                             <ReferenceLine y={capacity * 0.85} stroke="#f59e0b" strokeDasharray="4 4" label={{ value: '15% Reserve', fill: '#f59e0b', fontSize: 11, position: 'right' }} />
-                            <Area type="monotone" dataKey="aggressive" fill={selectedGrid === 'dbis' ? '#f59e0b' : '#10b981'} fillOpacity={0.1} stroke="none" />
+                            <Area type="monotone" dataKey="aggressive" fill={selectedGrid === 'dbis' ? '#f59e0b' : '#10b981'} fillOpacity={0.1} stroke="none" legendType="none" />
                             <Line type="monotone" dataKey="conservative" stroke={selectedGrid === 'dbis' ? '#f59e0b' : '#10b981'} strokeWidth={2} dot={{ fill: selectedGrid === 'dbis' ? '#f59e0b' : '#10b981', r: 4 }} name="Conservative" />
                             <Line type="monotone" dataKey="aggressive" stroke={selectedGrid === 'dbis' ? '#fb923c' : '#34d399'} strokeWidth={2} strokeDasharray="5 5" dot={{ fill: selectedGrid === 'dbis' ? '#fb923c' : '#34d399', r: 4 }} name="Aggressive" />
                           </ComposedChart>
@@ -1117,13 +1166,51 @@ const GPLDetail = ({ data }) => {
                           const aggress = multiForecast?.aggressive?.[selectedGrid] || {};
                           const capacity = selectedGrid === 'dbis' ? 230 : 36;
                           const currentPeak = selectedGrid === 'dbis' ? computedProjections.currentDbis : computedProjections.currentEsq;
+                          const gridKey = selectedGrid === 'dbis' ? 'dbis' : 'esq';
+
+                          // Calculate proper aggressive fallback: current + 1.5x growth (not 1.5x total)
+                          // Growth = projection - current, so aggressive = current + 1.5 * growth
+                          const calcAggressiveFallback = (conservativePeak) => {
+                            const growth = conservativePeak - currentPeak;
+                            return currentPeak + (growth * 1.5);
+                          };
 
                           const rows = [
-                            { period: 'Current', cKey: 'current_peak', aKey: 'current_peak', fallbackC: currentPeak, fallbackA: currentPeak },
-                            { period: '6 months', cKey: 'month_6', aKey: 'month_6', fallbackC: computedProjections[selectedGrid === 'dbis' ? 'dbis' : 'esq']['6mo'], fallbackA: computedProjections[selectedGrid === 'dbis' ? 'dbis' : 'esq']['6mo'] * 1.5 },
-                            { period: '12 months', cKey: 'month_12', aKey: 'month_12', fallbackC: computedProjections[selectedGrid === 'dbis' ? 'dbis' : 'esq']['12mo'], fallbackA: computedProjections[selectedGrid === 'dbis' ? 'dbis' : 'esq']['12mo'] * 1.5 },
-                            { period: '18 months', cKey: 'month_18', aKey: 'month_18', fallbackC: (computedProjections[selectedGrid === 'dbis' ? 'dbis' : 'esq']['12mo'] + computedProjections[selectedGrid === 'dbis' ? 'dbis' : 'esq']['24mo']) / 2, fallbackA: ((computedProjections[selectedGrid === 'dbis' ? 'dbis' : 'esq']['12mo'] + computedProjections[selectedGrid === 'dbis' ? 'dbis' : 'esq']['24mo']) / 2) * 1.5 },
-                            { period: '24 months', cKey: 'month_24', aKey: 'month_24', fallbackC: computedProjections[selectedGrid === 'dbis' ? 'dbis' : 'esq']['24mo'], fallbackA: computedProjections[selectedGrid === 'dbis' ? 'dbis' : 'esq']['24mo'] * 1.5 }
+                            {
+                              period: 'Current',
+                              cKey: 'current_peak',
+                              aKey: 'current_peak',
+                              fallbackC: currentPeak,
+                              fallbackA: currentPeak
+                            },
+                            {
+                              period: '6 months',
+                              cKey: 'month_6',
+                              aKey: 'month_6',
+                              fallbackC: computedProjections[gridKey]['6mo'],
+                              fallbackA: calcAggressiveFallback(computedProjections[gridKey]['6mo'])
+                            },
+                            {
+                              period: '12 months',
+                              cKey: 'month_12',
+                              aKey: 'month_12',
+                              fallbackC: computedProjections[gridKey]['12mo'],
+                              fallbackA: calcAggressiveFallback(computedProjections[gridKey]['12mo'])
+                            },
+                            {
+                              period: '18 months',
+                              cKey: 'month_18',
+                              aKey: 'month_18',
+                              fallbackC: (computedProjections[gridKey]['12mo'] + computedProjections[gridKey]['24mo']) / 2,
+                              fallbackA: calcAggressiveFallback((computedProjections[gridKey]['12mo'] + computedProjections[gridKey]['24mo']) / 2)
+                            },
+                            {
+                              period: '24 months',
+                              cKey: 'month_24',
+                              aKey: 'month_24',
+                              fallbackC: computedProjections[gridKey]['24mo'],
+                              fallbackA: calcAggressiveFallback(computedProjections[gridKey]['24mo'])
+                            }
                           ];
 
                           const getReserveClass = (reserve) => {
@@ -1328,9 +1415,20 @@ function ForecastMetricCard({ title, value, unit = '', isDate = false, trend = '
 
   let displayValue = 'N/A';
   if (isDate && value) {
-    displayValue = new Date(value).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-  } else if (value !== null && value !== undefined) {
-    displayValue = `${parseFloat(value).toFixed(1)}${unit}`;
+    // Format date string like "2026-08" to "Aug 2026"
+    const dateMatch = String(value).match(/^(\d{4})-(\d{2})$/);
+    if (dateMatch) {
+      const [, year, month] = dateMatch;
+      const d = new Date(parseInt(year), parseInt(month) - 1);
+      displayValue = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    } else {
+      displayValue = String(value);
+    }
+  } else if (typeof value === 'string') {
+    // String values like "Not projected" or "Low risk"
+    displayValue = value;
+  } else if (typeof value === 'number' && !isNaN(value)) {
+    displayValue = `${value.toFixed(1)}${unit}`;
   }
 
   return (

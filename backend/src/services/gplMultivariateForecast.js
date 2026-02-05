@@ -10,7 +10,7 @@ const { pool } = require('../config/database');
 
 // Claude Opus configuration
 const AI_CONFIG = {
-  MODEL: 'claude-opus-4-5-20250514',
+  MODEL: 'claude-opus-4-5-20251101',
   MAX_TOKENS: 4096,
   TEMPERATURE: 0.2
 };
