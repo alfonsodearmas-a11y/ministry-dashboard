@@ -312,9 +312,9 @@ const GPLDetail = ({ data }) => {
           alerts.push({
             id: `rec-${i}`,
             severity: 'medium',
-            title: rec.recommendation?.slice(0, 60) + (rec.recommendation?.length > 60 ? '...' : ''),
+            title: rec.recommendation,
             station: null,
-            detail: rec.recommendation,
+            detail: null,
             recommendation: null,
             category: rec.category
           });
@@ -489,7 +489,7 @@ const GPLDetail = ({ data }) => {
                             )}
                           </div>
                           {alert.detail && !expandedAlerts[alert.id] && (
-                            <p className="text-[#64748b] text-sm mt-1 truncate">{alert.detail}</p>
+                            <p className="text-[#64748b] text-sm mt-1">{alert.detail}</p>
                           )}
                           {expandedAlerts[alert.id] && (
                             <div className="mt-2 space-y-2">
