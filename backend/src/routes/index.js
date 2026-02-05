@@ -475,6 +475,66 @@ router.get('/gpl/kpi/analysis',
   asyncHandler(gplKpiController.getAnalysis)
 );
 
+// ============================================
+// GPL FORECAST ROUTES (Predictive Analytics)
+// ============================================
+const gplForecastController = require('../controllers/gplForecastController');
+
+// Get all forecast data (for dashboard)
+router.get('/gpl/forecast/all',
+  asyncHandler(gplForecastController.getAllForecasts)
+);
+
+// Get demand forecasts
+router.get('/gpl/forecast/demand',
+  asyncHandler(gplForecastController.getDemandForecast)
+);
+
+// Get capacity timeline
+router.get('/gpl/forecast/capacity-timeline',
+  asyncHandler(gplForecastController.getCapacityTimeline)
+);
+
+// Get load shedding analysis
+router.get('/gpl/forecast/load-shedding',
+  asyncHandler(gplForecastController.getLoadShedding)
+);
+
+// Get station reliability metrics
+router.get('/gpl/forecast/stations',
+  asyncHandler(gplForecastController.getStationReliability)
+);
+
+// Get units at risk
+router.get('/gpl/forecast/units-at-risk',
+  asyncHandler(gplForecastController.getUnitsAtRisk)
+);
+
+// Get reserve margin forecast
+router.get('/gpl/forecast/reserve',
+  asyncHandler(gplForecastController.getReserveMargin)
+);
+
+// Get Essequibo grid outlook
+router.get('/gpl/forecast/essequibo',
+  asyncHandler(gplForecastController.getEssequiboOutlook)
+);
+
+// Get KPI trend forecasts
+router.get('/gpl/forecast/kpi-trends',
+  asyncHandler(gplForecastController.getKpiTrends)
+);
+
+// Get latest AI strategic briefing
+router.get('/gpl/forecast/briefing',
+  asyncHandler(gplForecastController.getBriefing)
+);
+
+// Refresh all forecasts (recalculate)
+router.post('/gpl/forecast/refresh',
+  asyncHandler(gplForecastController.refreshForecasts)
+);
+
 router.post('/metrics/gcaa',
   authenticate,
   requirePasswordChange,

@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { AlertTriangle, Zap, CheckCircle, Sun, Ship, Factory, TrendingDown, Clock, Battery } from 'lucide-react';
 import GPLMonthlyKpi from '../GPLMonthlyKpi';
+import GPLForecastDashboard from '../GPLForecastDashboard';
 
 const GPLDetail = ({ data }) => {
   // Compute all metrics from raw station data
@@ -684,6 +685,14 @@ const GPLDetail = ({ data }) => {
 
       {/* Monthly KPI Section */}
       <GPLMonthlyKpi />
+
+      {/* Separator */}
+      <div className="border-t border-slate-700 my-6" />
+
+      {/* Predictive Analytics & Forecasting Section */}
+      <div className="bg-[#1a2438] rounded-xl p-4 sm:p-6 border border-[#243049]">
+        <GPLForecastDashboard />
+      </div>
     </div>
   );
 };

@@ -8,6 +8,7 @@
 const { pool } = require('../config/database');
 const { parseKpiCsv, formatForAnalysis, KNOWN_KPIS } = require('../services/gplKpiCsvParser');
 const Anthropic = require('@anthropic-ai/sdk');
+const forecastAI = require('../services/gplForecastAI');
 
 // AI Configuration
 const AI_CONFIG = {
@@ -139,6 +140,11 @@ async function confirmUpload(req, res) {
         console.error('[GPL KPI] AI analysis error:', err.message);
       });
     }
+
+    // Trigger forecast refresh (async, don't wait)
+    forecastAI.runFullAnalysis().catch(err => {
+      console.error('[GPL Forecast] Background error:', err);
+    });
 
     res.json({
       success: true,

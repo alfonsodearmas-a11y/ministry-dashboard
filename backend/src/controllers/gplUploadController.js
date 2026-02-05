@@ -14,6 +14,7 @@ const { pool, query, getClient, transaction } = require('../config/database');
 const { parseScheduleSheet } = require('../services/gplScheduleParser');
 const { parseStatusSheet, matchOutagesToUnits } = require('../services/gplStatusParser');
 const aiAnalysisService = require('../services/aiAnalysisService');
+const forecastAI = require('../services/gplForecastAI');
 
 /**
  * POST /api/gpl/upload
@@ -332,6 +333,11 @@ async function confirmUpload(req, res) {
           console.error('[GPL AI Analysis] Background error:', err);
         });
       }
+
+      // 7. Trigger forecast refresh (async, don't wait)
+      forecastAI.runFullAnalysis().catch(err => {
+        console.error('[GPL Forecast] Background error:', err);
+      });
 
       res.json({
         success: true,
