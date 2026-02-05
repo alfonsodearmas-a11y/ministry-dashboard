@@ -14,17 +14,14 @@ const transformGPLData = (apiData) => {
 
   // Build power stations array from stations data
   const powerStations = stations.map(station => {
-    // Find units for this station
-    const stationUnits = units?.filter(u => u.station === station.station_name) || [];
-    const onlineUnits = stationUnits.filter(u => u.status === 'online').length;
-    const totalUnits = stationUnits.length || station.total_units || 0;
+    const stationName = station.station || 'Unknown';
 
     return {
-      code: station.station_name?.toUpperCase().replace(/\s+/g, '_') || 'UNKNOWN',
-      name: station.station_name || 'Unknown',
+      code: stationName.toUpperCase().replace(/\s+/g, '_'),
+      name: stationName,
       type: 'fossil',
-      units: totalUnits,
-      onlineUnits,
+      units: parseInt(station.total_units) || 0,
+      onlineUnits: parseInt(station.units_online) || 0,
       derated: parseFloat(station.total_derated_capacity_mw) || 0,
       available: parseFloat(station.total_available_mw) || 0,
     };

@@ -504,74 +504,136 @@ const GPLDetail = ({ data }) => {
 
       {/* AI Executive Briefing */}
       {data.aiAnalysis && data.aiAnalysis.analysis_status === 'completed' && data.aiAnalysis.executive_briefing && !data.aiAnalysis.executive_briefing.includes('failed') && (
-        <details className="bg-purple-500/[0.08] border border-purple-500/30 rounded-xl overflow-hidden" open>
-          <summary className="px-3 sm:px-4 py-3 cursor-pointer hover:bg-purple-500/[0.05] transition-colors">
-            <div className="flex items-center justify-between">
-              <span className="text-purple-300 font-semibold text-sm sm:text-base flex items-center gap-2">
-                <Battery size={16} className="text-purple-400" />
-                AI Executive Briefing
-              </span>
-              <span className="text-purple-400/60 text-xs">Click to expand</span>
+        <div className="space-y-4">
+          {/* Header */}
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center">
+              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
             </div>
-          </summary>
-          <div className="px-3 sm:px-4 pb-4 space-y-4">
-            {/* Executive Summary */}
-            <div className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">
-              {data.aiAnalysis.executive_briefing}
+            <div>
+              <h3 className="text-white font-semibold">AI Intelligence Briefing</h3>
+              <p className="text-slate-500 text-xs">Powered by Claude • Analysis complete</p>
             </div>
-
-            {/* Critical Alerts */}
-            {data.aiAnalysis.critical_alerts && data.aiAnalysis.critical_alerts.length > 0 && (
-              <div>
-                <h4 className="text-red-400 text-xs font-semibold mb-2 uppercase tracking-wider">Critical Alerts</h4>
-                <div className="space-y-2">
-                  {data.aiAnalysis.critical_alerts.map((alert, i) => (
-                    <div key={i} className="p-2 bg-red-500/10 border border-red-500/30 rounded-lg">
-                      <p className="text-red-300 text-sm font-medium">{alert.title}</p>
-                      <p className="text-slate-400 text-xs mt-1">{alert.description}</p>
-                      {alert.recommendation && (
-                        <p className="text-slate-500 text-xs mt-1 italic">→ {alert.recommendation}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Station Concerns */}
-            {data.aiAnalysis.station_concerns && data.aiAnalysis.station_concerns.length > 0 && (
-              <div>
-                <h4 className="text-amber-400 text-xs font-semibold mb-2 uppercase tracking-wider">Station Concerns</h4>
-                <div className="space-y-2">
-                  {data.aiAnalysis.station_concerns.map((concern, i) => (
-                    <div key={i} className="p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-                      <p className="text-amber-300 text-sm font-medium">{concern.station}</p>
-                      <p className="text-slate-400 text-xs mt-1">{concern.issue}</p>
-                      {concern.impact && (
-                        <p className="text-slate-500 text-xs mt-1">Impact: {concern.impact}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Recommendations */}
-            {data.aiAnalysis.recommendations && data.aiAnalysis.recommendations.length > 0 && (
-              <div>
-                <h4 className="text-blue-400 text-xs font-semibold mb-2 uppercase tracking-wider">Recommendations</h4>
-                <ul className="space-y-1">
-                  {data.aiAnalysis.recommendations.map((rec, i) => (
-                    <li key={i} className="text-slate-400 text-xs flex items-start gap-2">
-                      <span className="text-blue-400 mt-0.5">•</span>
-                      <span>{rec.recommendation}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </div>
-        </details>
+
+          {/* Executive Summary Card */}
+          <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-slate-700/50 rounded-xl p-4">
+            <div className="prose prose-sm prose-invert max-w-none">
+              <p className="text-slate-300 text-sm leading-relaxed">
+                {data.aiAnalysis.executive_briefing}
+              </p>
+            </div>
+          </div>
+
+          {/* Alerts & Concerns Grid */}
+          {((data.aiAnalysis.critical_alerts && data.aiAnalysis.critical_alerts.length > 0) ||
+            (data.aiAnalysis.station_concerns && data.aiAnalysis.station_concerns.length > 0)) && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Critical Alerts */}
+              {data.aiAnalysis.critical_alerts && data.aiAnalysis.critical_alerts.length > 0 && (
+                <div className="bg-red-500/[0.05] border border-red-500/20 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-6 h-6 rounded-full bg-red-500/20 flex items-center justify-center">
+                      <AlertTriangle size={12} className="text-red-400" />
+                    </div>
+                    <h4 className="text-red-400 text-sm font-semibold">Critical Alerts</h4>
+                    <span className="ml-auto text-red-400/60 text-xs bg-red-500/10 px-2 py-0.5 rounded-full">
+                      {data.aiAnalysis.critical_alerts.length}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {data.aiAnalysis.critical_alerts.map((alert, i) => (
+                      <div key={i} className="bg-red-500/[0.08] rounded-lg p-3">
+                        <p className="text-red-300 text-sm font-medium">{alert.title}</p>
+                        <p className="text-slate-400 text-xs mt-1 leading-relaxed">{alert.description}</p>
+                        {alert.recommendation && (
+                          <p className="text-red-400/70 text-xs mt-2 flex items-start gap-1.5">
+                            <span className="text-red-400">→</span>
+                            {alert.recommendation}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Station Concerns */}
+              {data.aiAnalysis.station_concerns && data.aiAnalysis.station_concerns.length > 0 && (
+                <div className="bg-amber-500/[0.05] border border-amber-500/20 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center">
+                      <Factory size={12} className="text-amber-400" />
+                    </div>
+                    <h4 className="text-amber-400 text-sm font-semibold">Station Concerns</h4>
+                    <span className="ml-auto text-amber-400/60 text-xs bg-amber-500/10 px-2 py-0.5 rounded-full">
+                      {data.aiAnalysis.station_concerns.length}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {data.aiAnalysis.station_concerns.map((concern, i) => (
+                      <div key={i} className="bg-amber-500/[0.08] rounded-lg p-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-amber-300 text-sm font-medium">{concern.station}</span>
+                          {concern.priority && (
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${
+                              concern.priority === 'HIGH' ? 'bg-red-500/20 text-red-400' :
+                              concern.priority === 'MEDIUM' ? 'bg-amber-500/20 text-amber-400' :
+                              'bg-slate-500/20 text-slate-400'
+                            }`}>
+                              {concern.priority}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-slate-400 text-xs mt-1 leading-relaxed">{concern.issue}</p>
+                        {concern.impact && (
+                          <p className="text-slate-500 text-xs mt-1">
+                            <span className="text-amber-400/70">Impact:</span> {concern.impact}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Recommendations */}
+          {data.aiAnalysis.recommendations && data.aiAnalysis.recommendations.length > 0 && (
+            <div className="bg-blue-500/[0.05] border border-blue-500/20 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center">
+                  <TrendingDown size={12} className="text-blue-400 rotate-180" />
+                </div>
+                <h4 className="text-blue-400 text-sm font-semibold">Recommendations</h4>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {data.aiAnalysis.recommendations.map((rec, i) => (
+                  <div key={i} className="bg-blue-500/[0.08] rounded-lg p-3 flex items-start gap-2">
+                    <span className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs font-medium ${
+                      rec.urgency === 'Immediate' ? 'bg-red-500/30 text-red-300' :
+                      rec.urgency === 'Short-term' ? 'bg-amber-500/30 text-amber-300' :
+                      'bg-blue-500/30 text-blue-300'
+                    }`}>
+                      {i + 1}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-slate-300 text-xs leading-relaxed">{rec.recommendation}</p>
+                      {rec.category && (
+                        <span className="inline-block mt-1.5 text-xs text-blue-400/60 bg-blue-500/10 px-2 py-0.5 rounded">
+                          {rec.category}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Status Summary - Mobile optimized 2x2 grid */}
