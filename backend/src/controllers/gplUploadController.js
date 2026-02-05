@@ -165,6 +165,27 @@ async function confirmUpload(req, res) {
       let replacedUploadId = null;
       if (existingCheck.rows.length > 0) {
         replacedUploadId = existingCheck.rows[0].id;
+        // Delete old child records first (due to unique constraints)
+        await client.query(
+          `DELETE FROM gpl_daily_units WHERE upload_id = $1`,
+          [replacedUploadId]
+        );
+        await client.query(
+          `DELETE FROM gpl_daily_stations WHERE upload_id = $1`,
+          [replacedUploadId]
+        );
+        await client.query(
+          `DELETE FROM gpl_daily_summary WHERE upload_id = $1`,
+          [replacedUploadId]
+        );
+        await client.query(
+          `DELETE FROM gpl_outages WHERE upload_id = $1`,
+          [replacedUploadId]
+        );
+        await client.query(
+          `DELETE FROM gpl_ai_analysis WHERE upload_id = $1`,
+          [replacedUploadId]
+        );
         // Mark old upload as replaced
         await client.query(
           `UPDATE gpl_uploads SET status = 'replaced' WHERE id = $1`,
