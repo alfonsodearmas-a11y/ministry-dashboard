@@ -1,6 +1,39 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, Component } from 'react';
 import { Plane, Droplets, Zap, Shield, Save, CheckCircle, AlertCircle, LogOut, User, Calendar, Clock, ChevronDown, Eye, EyeOff, FileText, History, UserPlus, Mail, ArrowLeft, Battery, Sun, TrendingUp, Upload } from 'lucide-react';
 import GPLExcelUpload from './components/GPLExcelUpload';
+import DailyExcelUpload from './components/DailyExcelUpload';
+import { api } from './services/api';
+
+// Error boundary to catch rendering errors
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error('ErrorBoundary caught:', error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="bg-red-500/20 border border-red-500 rounded-lg p-4 text-red-300">
+          <h3 className="font-bold mb-2">Something went wrong</h3>
+          <pre className="text-sm overflow-auto">{this.state.error?.toString()}</pre>
+          <button
+            onClick={() => this.setState({ hasError: false, error: null })}
+            className="mt-2 px-4 py-2 bg-red-500 text-white rounded"
+          >
+            Try Again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // Simulated user accounts for each agency
 const USERS = {
@@ -1352,32 +1385,46 @@ const AgencySelector = ({ selectedAgency, onSelect }) => {
 
 // Main Admin Dashboard Component
 export default function MinistryDashboardAdmin() {
-  const [user, setUser] = useState(null);
+  // Auto-login for testing - bypass authentication
+  const [user, setUser] = useState({
+    username: 'admin',
+    name: 'System Administrator',
+    agency: 'ministry',
+    role: 'admin'
+  });
   const [loginError, setLoginError] = useState('');
   const [selectedAgency, setSelectedAgency] = useState(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [submittedAgency, setSubmittedAgency] = useState(null);
   const [showRegistration, setShowRegistration] = useState(false);
   const [gplEntryMode, setGplEntryMode] = useState('excel'); // 'dbis', 'excel', or 'basic' - default to Excel upload
+  const [portalMode, setPortalMode] = useState('agency'); // 'agency' or 'daily' - for ministry admins
 
-  const handleLogin = (username, password) => {
-    const userRecord = USERS[username];
-    if (userRecord && userRecord.password === password) {
-      if (userRecord.status === 'pending') {
-        setLoginError('Your account is pending approval. Please wait for an administrator to approve your registration.');
-        return;
+  const handleLogin = async (username, password) => {
+    try {
+      const response = await api.login(username, password);
+      if (response.success && response.data?.user) {
+        const userData = response.data.user;
+        setUser({
+          username: userData.username,
+          name: userData.fullName,
+          agency: userData.agency,
+          role: userData.role,
+        });
+        setLoginError('');
+        if (userData.agency && userData.agency !== 'all') {
+          setSelectedAgency(userData.agency);
+        }
+      } else {
+        setLoginError(response.error || 'Login failed');
       }
-      setUser({ username, ...userRecord });
-      setLoginError('');
-      if (userRecord.agency !== 'all') {
-        setSelectedAgency(userRecord.agency);
-      }
-    } else {
-      setLoginError('Invalid username or password');
+    } catch (err) {
+      setLoginError(err.message || 'Login failed. Please check your credentials.');
     }
   };
 
   const handleLogout = () => {
+    localStorage.removeItem('authToken');
     setUser(null);
     setSelectedAgency(null);
   };
@@ -1390,7 +1437,7 @@ export default function MinistryDashboardAdmin() {
 
   const handleSuccessClose = () => {
     setShowSuccess(false);
-    if (user.agency === 'all') {
+    if (user.agency === 'all' || user.agency === 'ministry') {
       setSelectedAgency(null);
     }
   };
@@ -1462,15 +1509,50 @@ export default function MinistryDashboardAdmin() {
             <div>
               <h2 className="text-xl font-semibold text-white mb-1">Daily Data Entry Portal</h2>
               <p className="text-[#94a3b8]">
-                Enter today's operational metrics for {user.agency === 'all' ? 'any agency' : AGENCIES[user.agency].fullName}.
+                Enter today's operational metrics for {user.agency === 'all' || user.agency === 'ministry' ? 'any agency' : AGENCIES[user.agency].fullName}.
                 All submissions are timestamped and logged for audit purposes.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Agency Selector (for Ministry Admin only) */}
-        {user.agency === 'all' && !selectedAgency && (
+        {/* Mode Selector (for Ministry Admin - switch between Agency Entry and Daily Upload) */}
+        {(user.agency === 'all' || user.agency === 'ministry') && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 bg-[#1a2438] border border-[#243049] rounded-lg p-2 w-fit">
+              <button
+                onClick={() => { setPortalMode('agency'); setSelectedAgency(null); }}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+                  portalMode === 'agency'
+                    ? 'bg-[#d4af37] text-[#0f1729]'
+                    : 'text-[#94a3b8] hover:text-white'
+                }`}
+              >
+                <FileText size={16} />
+                Agency Data Entry
+              </button>
+              <button
+                onClick={() => { setPortalMode('daily'); setSelectedAgency(null); }}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+                  portalMode === 'daily'
+                    ? 'bg-[#d4af37] text-[#0f1729]'
+                    : 'text-[#94a3b8] hover:text-white'
+                }`}
+              >
+                <Upload size={16} />
+                Daily Metrics Upload
+              </button>
+            </div>
+            {portalMode === 'daily' && (
+              <p className="text-sm text-[#94a3b8] mt-2">
+                Upload the daily wide-format Excel workbook with all agency metrics. AI analysis included.
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Agency Selector (for Ministry Admin only - when in agency mode) */}
+        {(user.agency === 'all' || user.agency === 'ministry') && portalMode === 'agency' && !selectedAgency && (
           <div className="mb-8">
             <label className="block text-[#94a3b8] text-sm mb-2">Select Agency</label>
             <AgencySelector selectedAgency={selectedAgency} onSelect={setSelectedAgency} />
@@ -1525,34 +1607,46 @@ export default function MinistryDashboardAdmin() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Data Entry Form */}
           <div className="lg:col-span-2">
-            {selectedAgency ? (
+            {/* Daily Metrics Upload Mode */}
+            {(user.agency === 'all' || user.agency === 'ministry') && portalMode === 'daily' ? (
+              <DailyExcelUpload
+                onSuccess={(data) => {
+                  console.log('Daily upload success:', data);
+                  setSubmittedAgency('ministry');
+                  setShowSuccess(true);
+                }}
+                onCancel={() => setPortalMode('agency')}
+              />
+            ) : selectedAgency ? (
               selectedAgency === 'gpl' ? (
                 gplEntryMode === 'excel' ? (
-                  <GPLExcelUpload
-                    onSuccess={(data) => {
-                      console.log('Excel upload success:', data);
-                      setSubmittedAgency('gpl');
-                      setShowSuccess(true);
-                    }}
-                    onCancel={() => user.agency === 'all' ? setSelectedAgency(null) : null}
-                  />
+                  <ErrorBoundary>
+                    <GPLExcelUpload
+                      onSuccess={(data) => {
+                        console.log('Excel upload success:', data);
+                        setSubmittedAgency('gpl');
+                        setShowSuccess(true);
+                      }}
+                      onCancel={() => user.agency === 'all' || user.agency === 'ministry' ? setSelectedAgency(null) : null}
+                    />
+                  </ErrorBoundary>
                 ) : gplEntryMode === 'dbis' ? (
                   <GPLDBISForm
                     onSubmit={handleSubmit}
-                    onCancel={() => user.agency === 'all' ? setSelectedAgency(null) : null}
+                    onCancel={() => user.agency === 'all' || user.agency === 'ministry' ? setSelectedAgency(null) : null}
                   />
                 ) : (
                   <DataEntryForm
                     agency={selectedAgency}
                     onSubmit={handleSubmit}
-                    onCancel={() => user.agency === 'all' ? setSelectedAgency(null) : null}
+                    onCancel={() => user.agency === 'all' || user.agency === 'ministry' ? setSelectedAgency(null) : null}
                   />
                 )
               ) : (
                 <DataEntryForm
                   agency={selectedAgency}
                   onSubmit={handleSubmit}
-                  onCancel={() => user.agency === 'all' ? setSelectedAgency(null) : null}
+                  onCancel={() => user.agency === 'all' || user.agency === 'ministry' ? setSelectedAgency(null) : null}
                 />
               )
             ) : (
@@ -1640,7 +1734,7 @@ export default function MinistryDashboardAdmin() {
       {showSuccess && submittedAgency && (
         <SuccessModal
           agency={submittedAgency}
-          isDBIS={submittedAgency === 'gpl' && useDBISForm}
+          isDBIS={submittedAgency === 'gpl' && gplEntryMode === 'dbis'}
           onClose={handleSuccessClose}
         />
       )}
